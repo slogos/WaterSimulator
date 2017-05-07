@@ -1,0 +1,214 @@
+import System.IO;
+import System.Collections.Generic;
+import System.Text;
+
+#pragma strict
+ 
+public var count : int = 0;
+public var n1 : int;
+public var n2 : int;
+public var n3 : int;
+public var n4 : int = 0;
+var myQueue = new Queue.<int>();
+public var circleRadius : int = 12;
+public var paintWeight : float = 0.001;
+public var rayTimeInterval : float = 0.1;
+ 
+private var rayTimer : float = 0;
+private var rayHitPoint : Vector3;
+private var heightmapPos : Vector3;
+ 
+ 
+//  Persistant Functions
+//    ----------------------------------------------------------------------------
+
+function Start() 
+{
+    ReadFile();
+    GetTerrainData();
+    ResetHeights(); // FOR TESTING, reset to flat terrain
+    for (item in myQueue)
+        count++;
+    if (count >= 3)
+    {    
+        n1 = myQueue.Dequeue();
+        n2 = myQueue.Dequeue();
+        n3 = myQueue.Dequeue();
+        print (n1);
+        print (n2);
+        print (n3);
+        count = count - 3;
+    }
+}
+  
+function Update() 
+{
+    rayTimer += Time.deltaTime;
+     
+    if ( rayTimer < rayTimeInterval )
+        return;
+     
+    rayTimer = 0;
+     
+    RaycastToTerrain();
+    GetHeightmapPosition();
+     
+    //if ( Input.GetMouseButton(0) && rayHitPoint != Vector3.zero )
+    if (n4 < n3)
+    {
+        PaintCircle( heightmapPos);
+        n4++;
+    }
+    else if (count)
+    {
+        n1 = myQueue.Dequeue();
+        n2 = myQueue.Dequeue();
+        n3 = myQueue.Dequeue();
+        print (n1);
+        print (n2);
+        print (n3);
+        n4 = 0;
+        count = count - 3;
+    }   
+}
+ 
+function ReadFile() {
+    var sr = new StreamReader("C:/Data/42/resources/demo1.mod1");
+    var fileContents = sr.ReadToEnd();
+    sr.Close();
+
+    var lines = fileContents.Replace(")", " ");
+    lines = lines.Replace("(", " ");
+    lines = lines.Replace(",", " ");
+    var newList = lines.Split(" "[0]);
+    var i : int;
+    for (line in newList)
+        if (int.TryParse(line, i))
+        {
+            i = i/100;
+            myQueue.Enqueue(i);
+        }
+}
+
+//  Terrain Data
+//    ----------------------------------------------------------------------------
+ 
+ 
+public var terrain : Terrain;
+private var terrainData : TerrainData;
+private var terrainSize : Vector3;
+private var heightmapWidth : int;
+private var heightmapHeight : int;
+private var heightmapData : float[,];
+ 
+ 
+function GetTerrainData()
+{
+    if ( !terrain )
+        terrain = Terrain.activeTerrain;
+ 
+    terrainData = terrain.terrainData;
+ 
+    terrainSize = terrain.terrainData.size;
+ 
+    heightmapWidth = terrain.terrainData.heightmapWidth;
+    heightmapHeight = terrain.terrainData.heightmapHeight;
+ 
+    heightmapData = terrainData.GetHeights( 0, 0, heightmapWidth, heightmapHeight );
+}
+ 
+ 
+//  Other Functions
+//    ----------------------------------------------------------------------------
+ 
+ 
+function RaycastToTerrain() 
+{
+    rayHitPoint = Vector3.zero;
+     
+    var hit : RaycastHit;
+    var rayPos : Ray = Camera.main.ScreenPointToRay( Input.mousePosition );
+ 
+    if ( Physics.Raycast( rayPos, hit, Mathf.Infinity ) ) // also consider a layermask to just the terrain layer
+    {
+        rayHitPoint = hit.point;
+        Debug.DrawLine( Camera.main.transform.position, hit.point, Color.red, rayTimeInterval );
+    }
+}
+ 
+ 
+function GetHeightmapPosition() 
+{
+    // find the heightmap position of that hit
+    if (n4 < n3)
+    {
+        heightmapPos.x = ( n1++ / terrainSize.x ) * parseFloat( heightmapWidth );
+        heightmapPos.z = ( n2 / terrainSize.z ) * parseFloat( heightmapHeight );
+    }
+        // convert to integer
+        heightmapPos.x = Mathf.RoundToInt( heightmapPos.x );
+        heightmapPos.z = Mathf.RoundToInt( heightmapPos.z );
+ 
+        // clamp to heightmap dimensions to avoid errors
+        heightmapPos.x = Mathf.Clamp( heightmapPos.x, 0, heightmapWidth - 1 );
+        heightmapPos.z = Mathf.Clamp( heightmapPos.z, 0, heightmapHeight - 1 );
+}
+ 
+ 
+function PaintCircle( point : Vector3 ) 
+    {
+        var x : int;
+        var z : int;
+        var heightX : int;
+        var heightZ : int;
+        var heightY : float;
+        var calc : Vector2;
+     
+        for ( z = -60; z <= 60; z ++ )
+        {
+            for ( x = -60; x <= 60; x ++ )
+            {
+                // for a circle, calcualate a relative Vector2
+                calc = new Vector2( x, z );
+                // check if the magnitude is within the circle radius
+                if ( calc.magnitude <= 60 )
+                {
+                    // is within circle, paint height
+                    heightX = point.x + x;
+                    heightZ = point.z + z;
+                 
+                    // check if heightX and Z is within the heightmapData array size
+                    if ( heightX >= 0 && heightX < heightmapWidth && heightZ >= 0 && heightZ < heightmapHeight )
+                    {
+                        // read current height
+                        heightY = heightmapData[ heightZ, heightX ]; // note that in heightmapData, X and Z are reversed
+                     
+                        // add paintWeight to the current height
+                        heightY += paintWeight;
+                     
+                        // update heightmapData array
+                        heightmapData[ heightZ, heightX ] = heightY;
+                    }
+                }
+            }
+        }
+     
+        // apply new heights to terrainData
+        terrainData.SetHeights( 0, 0, heightmapData );
+    }
+ 
+    function ResetHeights() // FOR TESTING, reset to flat terrain
+    {
+        var x : int;
+        var z : int;
+     
+        for ( z = 0; z < heightmapHeight; z ++ )
+        {
+            for ( x = 0; x < heightmapWidth; x ++ )
+            {
+                heightmapData[ z, x ] = 0;
+            }
+        }
+     
+        terrainData.SetHeights( 0, 0, heightmapData );
+    }

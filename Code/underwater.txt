@@ -1,0 +1,26 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class underWater : MonoBehaviour
+{
+
+    float i = -9.00F;
+    void Start()
+    {
+
+    }
+    void Update()
+    {
+        i += 0.03F;
+        if (transform.position.y < i)
+        {
+            RenderSettings.fog = true;
+            RenderSettings.fogDensity = 0.01F;
+        }
+        else
+        {
+            RenderSettings.fog = false;
+        }
+    }
+}
